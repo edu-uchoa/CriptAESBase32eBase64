@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <h2>Criptografia com AES-GCM</h2>
+
+    <input id="textToEncrypt" placeholder="Texto para criptografar"><br>
+    <input id="passwordEncrypt" placeholder="Senha"><br>
+    <label>Codificação:</label>
+    <select id="encodingTypeEncrypt">
+        <option value="base64">Base64</option>
+        <option value="base32">Base32</option>
+    </select><br>
+    <button onclick="encryptText()">Criptografar</button>
+    <p>Texto criptografado:</p>
+    <p id="encryptedOutput"></p>
+
+    <hr>
+
+    <input id="textToDecrypt" placeholder="Texto criptografado"><br>
+    <input id="passwordDecrypt" placeholder="Senha"><br>
+    <label>Codificação:</label>
+    <select id="encodingTypeDecrypt">
+        <option value="base64">Base64</option>
+        <option value="base32">Base32</option>
+    </select><br>
+    <button onclick="decryptText()">Descriptografar</button>
+    <p>Texto descriptografado:</p>
+    <p id="decryptedOutput"></p>
+
+    <script>
+        // Tabela Base32 (RFC 4648)
+        const base32Chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+
+        // Função para codificar em Base32
+        function toBase32(bytes) {
+            let bits = 0;
+            let value = 0;
+            let output = "";
+
+            for (const byte of bytes) {
+                value = (value << 8) | byte;
+                bits += 8;
+
+                while (bits >= 5) {
+                    output += base32Chars[(value >>> (bits - 5)) & 31];
+                    bits -= 5;
+                }
+            }
+
+            if (bits > 0) {
+                output += base32Chars[(value << (5 - bits)) & 31];
+            }
+
+            return output;
+        }
+
+        // Função para decodificar de Base32
+        function fromBase32(str) {
+            let bits = 0;
+            let value = 0;
+            const output = [];
+
+            str = str.replace(/=+$/, "").toUpperCase();
+
+            for (const char of str) {
+                const index = base32Chars.indexOf(char);
+                if (index === -1) continue;
+
+                value = (value << 5) | index;
+                bits += 5;
+
+                if (bits >= 8) {
+                    output.push((value >>> (bits - 8)) & 0xff);
+                    bits -= 8;
+                }
+            }
+
+            return new Uint8Array(output);
+        }
+
+        // Define uma função assíncrona que gera uma chave de criptografia derivada da senha fornecida.
+        async function getKey(password) {
+            // Cria um codificador que converte strings (como "senha123") para bytes (Uint8Array)
+            // , que é o que o Web Crypto API exige.
+            const enc = new TextEncoder();
+
+            //  Importa a senha bruta como material de chave, usando o algoritmo PBKDF2, que é uma forma de
+            //  "esticar" e proteger senhas contra ataques de força bruta.
+            const keyMaterial = await window.crypto.subtle.importKey(
+                "raw",
+                enc.encode(password),
+                { name: "PBKDF2" },
+                false,
+                ["deriveKey"]
+            );
+
+            //   Usa PBKDF2 para derivar uma chave segura com:
+            //     Um salt fixo (sal é um valor extra adicionado à senha para dificultar ataques).
+            //     100.000 iterações (quanto mais, mais seguro).
+            //     Hash criptográfico SHA-256.
+            return window.crypto.subtle.deriveKey(
+                {
+                    name: "PBKDF2",
+                    salt: enc.encode("sal-fixo"), // em produção, gere um salt aleatório!
+                    iterations: 100000,
+                    hash: "SHA-256"
+                },
+                // Retorna uma chave derivada de 256 bits, adequada para uso com o algoritmo AES-GCM
+                // , com permissão para criptografar e descriptografar.
+                keyMaterial,
+                { name: "AES-GCM", length: 256 },
+                false,
+                ["encrypt", "decrypt"]
+            );
+        }
+
+        async function encryptText() {
+            const text = document.getElementById("textToEncrypt").value;
+            const password = document.getElementById("passwordEncrypt").value;
+            const encoding = document.getElementById("encodingTypeEncrypt").value;
+
+            // Cria o codificador para transformar texto em bytes.
+            const enc = new TextEncoder();
+
+            // Gera um vetor de inicialização (IV) aleatório de 12 bytes, exigido pelo AES-GCM.
+            // Garante que a criptografia será única mesmo com mesma senha.
+            const iv = window.crypto.getRandomValues(new Uint8Array(12));
+
+            // Gera a chave AES a partir da senha digitada.
+            const key = await getKey(password);
+
+            // Criptografa o texto:
+            const encrypted = await window.crypto.subtle.encrypt(
+                { name: "AES-GCM", iv },
+                key,
+                enc.encode(text)
+            );
+
+            // Converte o dado criptografado para um array de bytes.
+            const encryptedBytes = new Uint8Array(encrypted);
+
+            // Junta o IV + dados criptografados em um único array (full).
+            const full = new Uint8Array(iv.length + encryptedBytes.length);
+            full.set(iv);
+            full.set(encryptedBytes, iv.length);
+
+            let result;
+            if (encoding === "base32") {
+                result = toBase32(full);
+            } else {
+                result = btoa(String.fromCharCode(...full));
+            }
+
+            document.getElementById("encryptedOutput").textContent = result;
+        }
+
+        async function decryptText() {
+            const encodedText = document.getElementById("textToDecrypt").value;
+            const password = document.getElementById("passwordDecrypt").value;
+            const encoding = document.getElementById("encodingTypeDecrypt").value;
+
+            try {
+                let bytes;
+
+                if (encoding === "base32") {
+                    bytes = fromBase32(encodedText);
+                } else {
+                    const binary = atob(encodedText);
+                    bytes = new Uint8Array([...binary].map(c => c.charCodeAt(0)));
+                }
+
+                // Separa os primeiros 12 bytes como o IV e o restante como os dados criptografados.
+                const iv = bytes.slice(0, 12);
+                const data = bytes.slice(12);
+
+                // Gera novamente a chave AES a partir da senha digitada.
+                const key = await getKey(password);
+
+                // Tenta descriptografar os dados com o AES-GCM usando o iv e a chave.
+                const decrypted = await window.crypto.subtle.decrypt(
+                    { name: "AES-GCM", iv },
+                    key,
+                    data
+                );
+
+                // Decodifica os bytes descriptografados de volta para texto comum e exibe no HTML.
+                const dec = new TextDecoder();
+                document.getElementById("decryptedOutput").textContent = dec.decode(decrypted);
+            } catch (e) {
+                document.getElementById("decryptedOutput").textContent = "Erro: senha incorreta ou dados inválidos.";
+            }
+        }
+    </script>
+</body>
+</html>
