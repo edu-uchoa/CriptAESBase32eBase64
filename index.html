@@ -4,33 +4,38 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Document</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <h2>Criptografia com AES-GCM</h2>
 
-    <input id="textToEncrypt" placeholder="Texto para criptografar"><br>
-    <input id="passwordEncrypt" placeholder="Senha"><br>
-    <label>Codificação:</label>
-    <select id="encodingTypeEncrypt">
-        <option value="base64">Base64</option>
-        <option value="base32">Base32</option>
-    </select><br>
-    <button onclick="encryptText()">Criptografar</button>
-    <p>Texto criptografado:</p>
-    <p id="encryptedOutput"></p>
-
-    <hr>
-
-    <input id="textToDecrypt" placeholder="Texto criptografado"><br>
-    <input id="passwordDecrypt" placeholder="Senha"><br>
-    <label>Codificação:</label>
-    <select id="encodingTypeDecrypt">
-        <option value="base64">Base64</option>
-        <option value="base32">Base32</option>
-    </select><br>
-    <button onclick="decryptText()">Descriptografar</button>
-    <p>Texto descriptografado:</p>
-    <p id="decryptedOutput"></p>
+    <div id="principal">
+        <div id="div1">
+            <textarea id="textToEncrypt" placeholder="Texto para criptografar" rows="4"></textarea>
+            <input id="passwordEncrypt" placeholder="Senha"><br>
+            <label>Codificação:</label>
+            <select id="encodingTypeEncrypt">
+                <option value="base64">Base64</option>
+                <option value="base32">Base32</option>
+            </select><br>
+            <button onclick="encryptText()">Criptografar</button>
+            <p>Texto criptografado:</p>
+            <p id="encryptedOutput"></p>
+        </div>
+    
+        <div id="div2">
+            <textarea id="textToDecrypt" placeholder="Texto criptografado" rows="4"></textarea>
+            <input id="passwordDecrypt" placeholder="Senha"><br>
+            <label>Codificação:</label>
+            <select id="encodingTypeDecrypt">
+                <option value="base64">Base64</option>
+                <option value="base32">Base32</option>
+            </select><br>
+            <button onclick="decryptText()">Descriptografar</button>
+            <p>Texto descriptografado:</p>
+            <p id="decryptedOutput"></p>
+        </div>
+    </div>
 
     <script>
            // Tabela Base32 conforme RFC 4648, caracteres usados para codificação Base32
